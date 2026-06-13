@@ -106,10 +106,12 @@ def apply_memory_cap(device: torch.device, cap_gb: Optional[float]) -> Optional[
         return fraction
 
     if device.type == "cuda":
+        # Resolve to a concrete integer index — `torch.device("cuda")` has no index,
+        # and set_per_process_memory_fraction requires an explicit one.
         idx = device.index if device.index is not None else torch.cuda.current_device()
         total = torch.cuda.get_device_properties(idx).total_memory
         fraction = memory_cap_fraction(cap_gb, total, max_fraction=1.0)
-        torch.cuda.set_per_process_memory_fraction(fraction, device)
+        torch.cuda.set_per_process_memory_fraction(fraction, idx)
         return fraction
 
     # CPU: there is no per-process device-memory allocator to cap.

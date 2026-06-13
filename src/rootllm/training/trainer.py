@@ -47,13 +47,17 @@ class Trainer:
         self.amp = resolve_amp(self.tcfg.dtype, self.device)
 
         if self.tcfg.memory_cap_gb:
-            fraction = apply_memory_cap(self.device, self.tcfg.memory_cap_gb)
+            fraction = None
+            try:
+                fraction = apply_memory_cap(self.device, self.tcfg.memory_cap_gb)
+            except Exception as e:  # a cap problem must never block a run
+                self.log.warning("could not apply memory cap (%s) — continuing without it", e)
             if fraction is not None:
                 self.log.info(
                     "memory cap: %.1f GB (%s fraction %.3f)",
                     self.tcfg.memory_cap_gb, self.device.type, fraction,
                 )
-            else:
+            elif self.device.type not in ("cuda", "mps"):
                 self.log.warning(
                     "memory_cap_gb=%.1f set but cannot be enforced on %s",
                     self.tcfg.memory_cap_gb, self.device.type,
