@@ -27,7 +27,10 @@ jobs:
     timeout-minutes: 2880        # allow long / overnight runs
     defaults:
       run:
-        shell: powershell
+        # Bypass the default 'Restricted' execution policy on self-hosted Windows
+        # runners (which blocks the temp .ps1 each step is written to), and
+        # propagate the last command's exit code so failures fail the step.
+        shell: 'powershell -ExecutionPolicy Bypass -Command "& ''{0}''; exit $LASTEXITCODE"'
     steps:
       - uses: actions/checkout@v4
         with:
