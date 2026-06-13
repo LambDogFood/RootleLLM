@@ -11,6 +11,10 @@ on:
         description: "Checkpoint to serve"
         default: "out/rtx5070/ckpt.pt"
         type: string
+      tokenizer:
+        description: "Tokenizer json (match the dataset you trained on)"
+        default: "data/tinystories/tokenizer.json"
+        type: string
 
 jobs:
   serve:
@@ -27,6 +31,7 @@ jobs:
       - name: (Re)start inference server on :8000
         env:
           ROOTLLM_CKPT: ${{ inputs.ckpt }}
+          ROOTLLM_TOKENIZER: ${{ inputs.tokenizer }}
         run: |
           docker compose up -d --force-recreate serve
           Write-Output "serving $env:ROOTLLM_CKPT on :8000"

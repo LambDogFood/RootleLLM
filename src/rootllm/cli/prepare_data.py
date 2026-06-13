@@ -22,7 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Tokenise text into train/val token bins.")
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--input", nargs="+", help="one or more UTF-8 text files")
-    src.add_argument("--dataset", choices=sorted(DATASETS), help="download a built-in dataset")
+    src.add_argument("--dataset", choices=sorted(DATASETS) + ["luau"],
+                     help="a built-in text dataset, or 'luau' to build a Roblox/Luau code corpus")
     p.add_argument("--output-dir", default="data", help="directory for the .bin / meta files")
     p.add_argument("--tokenizer", default="byte", choices=["byte", "tiktoken"])
     p.add_argument("--encoding", default="gpt2", help="tiktoken encoding name (if --tokenizer tiktoken)")
@@ -38,7 +39,14 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     tok = build_tokenizer(args.tokenizer, **({"encoding": args.encoding} if args.tokenizer == "tiktoken" else {}))
 
-    if args.dataset:
+    if args.dataset == "luau":
+        from ..data.luau import fetch_luau_corpus
+
+        log.info("building Luau corpus from public Roblox repos ...")
+        corpus, n_files = fetch_luau_corpus(os.path.join(args.output_dir, "luau_corpus.txt"))
+        log.info("extracted %d .lua/.luau files", n_files)
+        input_paths = [corpus]
+    elif args.dataset:
         log.info("downloading dataset %r ...", args.dataset)
         input_paths = download_dataset(args.dataset)
     else:

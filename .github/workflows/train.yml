@@ -12,6 +12,10 @@ on:
         description: "Config file"
         default: "configs/rtx5070.yaml"
         type: string
+      dataset:
+        description: "Dataset: tinystories (default) or luau (Roblox code)"
+        default: "tinystories"
+        type: string
       max_steps:
         description: "max_steps override (blank = use the config's value)"
         default: ""
@@ -40,9 +44,11 @@ jobs:
         run: docker compose build
 
       - name: Prepare data if missing
+        env:
+          DATASET: ${{ inputs.dataset }}
         run: |
-          if (-not (Test-Path "data/tinystories/train.bin")) {
-            docker compose run --rm prep
+          if (-not (Test-Path "data/$env:DATASET/train.bin")) {
+            docker compose run --rm train python scripts/prepare_data.py --dataset $env:DATASET --tokenizer tiktoken --output-dir "data/$env:DATASET"
           } else {
             Write-Output "data already present, skipping prep"
           }
@@ -50,12 +56,13 @@ jobs:
       - name: Train
         env:
           CONFIG: ${{ inputs.config }}
+          DATASET: ${{ inputs.dataset }}
           MAX_STEPS: ${{ inputs.max_steps }}
           EXTRA: ${{ inputs.extra_args }}
         run: |
           $set = @(
-            "data.train_path=data/tinystories/train.bin",
-            "data.val_path=data/tinystories/val.bin"
+            "data.train_path=data/$env:DATASET/train.bin",
+            "data.val_path=data/$env:DATASET/val.bin"
           )
           if ($env:MAX_STEPS -ne "") { $set += "train.schedule.max_steps=$env:MAX_STEPS" }
           $cmd = @("python", "scripts/train.py", "--config", $env:CONFIG, "--set") + $set
