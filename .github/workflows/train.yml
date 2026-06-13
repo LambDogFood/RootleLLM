@@ -1,4 +1,4 @@
-# Train on the self-hosted runner (your Windows PC) — triggered from the GitHub
+# Train on the self-hosted runner (your Windows PC), triggered from the GitHub
 # UI "Run workflow" button or `gh workflow run train.yml -f max_steps=5000`.
 #
 # Requires a self-hosted runner installed on the PC with Docker Desktop running.
@@ -44,7 +44,7 @@ jobs:
           if (-not (Test-Path "data/tinystories/train.bin")) {
             docker compose run --rm prep
           } else {
-            Write-Output "data already present — skipping prep"
+            Write-Output "data already present, skipping prep"
           }
 
       - name: Train

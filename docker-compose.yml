@@ -6,7 +6,7 @@
 #   docker compose run --rm gpu-check # sanity: prints True + the GPU name
 #
 # The code is bind-mounted, so edits synced from the Mac take effect without a
-# rebuild — only rerun `build` when dependencies change.
+# rebuild - only rerun `build` when dependencies change.
 services:
   train:
     build:
