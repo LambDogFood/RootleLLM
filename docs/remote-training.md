@@ -161,9 +161,32 @@ ssh <you>@<pc-ip> "cd rootllm && git pull && docker compose run -d --name train 
 ssh <you>@<pc-ip> "docker logs -f train"        # watch progress
 ```
 
-(Alternatively, a GitHub Actions **self-hosted runner** with a `workflow_dispatch`
-job lets you start a run from a button or `gh workflow run` — no SSH, no inbound
-networking.)
+### Push-button training (self-hosted runner — recommended)
+
+A GitHub Actions **self-hosted runner** on the PC turns training into a button (or
+`gh workflow run`) — no SSH, no inbound networking (the runner long-polls GitHub).
+The workflows are already in `.github/workflows/` (`train.yml`, `serve.yml`).
+
+One-time, on the PC:
+1. GitHub repo → **Settings → Actions → Runners → New self-hosted runner →
+   Windows**. Run the download/configure commands it shows.
+2. Install it as an always-on service so it survives reboots:
+   ```powershell
+   cd C:\actions-runner; .\svc.cmd install; .\svc.cmd start
+   ```
+3. Keep **Docker Desktop running** (set it to start on login).
+
+Then, from anywhere (laptop, phone, GitHub UI):
+- **GitHub UI:** repo → Actions → *train* → **Run workflow** (optionally set
+  `max_steps`, `config`, or extra `--set` overrides).
+- **CLI:** `gh workflow run train.yml -f max_steps=5000`
+- Watch live logs in the Actions tab; checkpoints land in the runner's `out/`.
+
+`serve.yml` does the same for the inference server:
+`gh workflow run serve.yml -f ckpt=out/rtx5070/best.pt`, then query from the laptop.
+
+The runner does a `clean: false` checkout, so `data/` and `out/` (checkpoints)
+persist across runs.
 
 ### Query the model from the laptop
 

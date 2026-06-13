@@ -1,0 +1,32 @@
+# (Re)start the inference server on the self-hosted runner (your PC), so you can
+# query the model from your laptop. Trigger from the GitHub UI or
+# `gh workflow run serve.yml -f ckpt=out/rtx5070/best.pt`.
+name: serve
+run-name: "serve ${{ inputs.ckpt }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ckpt:
+        description: "Checkpoint to serve"
+        default: "out/rtx5070/ckpt.pt"
+        type: string
+
+jobs:
+  serve:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: (Re)start inference server on :8000
+        env:
+          ROOTLLM_CKPT: ${{ inputs.ckpt }}
+        run: |
+          docker compose up -d --force-recreate serve
+          Write-Output "serving $env:ROOTLLM_CKPT on :8000"
+          Write-Output "query it:  rootllm-query --host <pc-ip> --prompt '...'"

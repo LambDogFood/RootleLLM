@@ -1,0 +1,61 @@
+# Train on the self-hosted runner (your Windows PC) — triggered from the GitHub
+# UI "Run workflow" button or `gh workflow run train.yml -f max_steps=5000`.
+#
+# Requires a self-hosted runner installed on the PC with Docker Desktop running.
+name: train
+run-name: "train ${{ inputs.config }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Config file"
+        default: "configs/rtx5070.yaml"
+        type: string
+      max_steps:
+        description: "max_steps override (blank = use the config's value)"
+        default: ""
+        type: string
+      extra_args:
+        description: "Extra '--set k=v' overrides, space-separated"
+        default: ""
+        type: string
+
+jobs:
+  train:
+    runs-on: self-hosted
+    timeout-minutes: 2880        # allow long / overnight runs
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false           # keep data/ and out/ (checkpoints) across runs
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Prepare data if missing
+        run: |
+          if (-not (Test-Path "data/tinystories/train.bin")) {
+            docker compose run --rm prep
+          } else {
+            Write-Output "data already present — skipping prep"
+          }
+
+      - name: Train
+        env:
+          CONFIG: ${{ inputs.config }}
+          MAX_STEPS: ${{ inputs.max_steps }}
+          EXTRA: ${{ inputs.extra_args }}
+        run: |
+          $set = @(
+            "data.train_path=data/tinystories/train.bin",
+            "data.val_path=data/tinystories/val.bin"
+          )
+          if ($env:MAX_STEPS -ne "") { $set += "train.schedule.max_steps=$env:MAX_STEPS" }
+          $cmd = @("python", "scripts/train.py", "--config", $env:CONFIG, "--set") + $set
+          if ($env:EXTRA -ne "") { $cmd += $env:EXTRA.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries) }
+          Write-Output "running: docker compose run --rm train $cmd"
+          docker compose run --rm train @cmd

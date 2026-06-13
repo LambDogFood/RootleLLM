@@ -48,5 +48,5 @@ services:
     ports:
       - "8000:8000"
     command: >
-      python scripts/serve.py --ckpt out/rtx5070/ckpt.pt
-      --tokenizer data/tinystories/tokenizer.json --host 0.0.0.0 --port 8000
+      python scripts/serve.py --ckpt ${ROOTLLM_CKPT:-out/rtx5070/ckpt.pt}
+      --tokenizer ${ROOTLLM_TOKENIZER:-data/tinystories/tokenizer.json} --host 0.0.0.0 --port 8000
