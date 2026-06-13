@@ -1,0 +1,42 @@
+# Convenience wrapper so a training run is one command on the PC (inside WSL2).
+#
+#   docker compose build
+#   docker compose run --rm prep      # download + tokenise TinyStories (writes ./data)
+#   docker compose run --rm train     # train on the GPU (writes ./out)
+#   docker compose run --rm gpu-check # sanity: prints True + the GPU name
+#
+# The code is bind-mounted, so edits synced from the Mac take effect without a
+# rebuild — only rerun `build` when dependencies change.
+services:
+  train:
+    build:
+      context: .
+      args:
+        BASE: ${ROOTLLM_BASE_IMAGE:-pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime}
+    image: rootllm:latest
+    working_dir: /workspace/rootllm
+    volumes:
+      - .:/workspace/rootllm        # live code: edit on Mac -> sync -> container sees it
+      - ./data:/workspace/rootllm/data
+      - ./out:/workspace/rootllm/out
+    environment:
+      - PYTHONPATH=/workspace/rootllm/src
+    shm_size: "8gb"
+    gpus: all                       # if your Compose is older, use the `deploy:` block below
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+    command: >
+      python scripts/train.py --config configs/rtx5070.yaml
+      --set data.train_path=data/tinystories/train.bin data.val_path=data/tinystories/val.bin
+
+  prep:
+    extends: train
+    command: >
+      python scripts/prepare_data.py --dataset tinystories --tokenizer tiktoken
+      --output-dir data/tinystories
+
+  gpu-check:
+    extends: train
+    command: python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"

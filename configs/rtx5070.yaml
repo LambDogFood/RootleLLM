@@ -1,0 +1,56 @@
+# RTX 5070 (12 GB, Blackwell) — a ~115M-param model, the "somewhat usable" tier.
+#
+# Requires a CUDA build of PyTorch >= 2.7 (CUDA 12.8+) so it recognises Blackwell
+# (sm_120). On CUDA the code auto-enables bf16, FlashAttention (via SDPA), and
+# fused AdamW — no extra flags needed.
+#
+#   rootllm-prepare-data --dataset tinystories --tokenizer tiktoken --output-dir data/tinystories
+#   rootllm-train --config configs/rtx5070.yaml --set data.train_path=data/tinystories/train.bin \
+#                                                      data.val_path=data/tinystories/val.bin
+#
+# Effective batch = batch_size * grad_accum_steps * seq_len = 16*2*512 = 16,384 tokens/step.
+# max_steps 200000 => ~3.3B tokens (~Chinchilla-optimal for 115M); roughly an overnight run.
+# Scale up to ~350M with: model.dim=1024 model.n_layers=20 (keep gradient_checkpointing on).
+model:
+  vocab_size: 50257           # tiktoken gpt2
+  dim: 768
+  n_layers: 12
+  n_heads: 12
+  n_kv_heads: 4               # grouped-query attention
+  max_seq_len: 1024
+  dropout: 0.0
+  use_qk_norm: true
+  rope_theta: 10000.0
+  tie_embeddings: true
+  gradient_checkpointing: true   # trades ~30% compute for memory headroom on 12 GB
+
+train:
+  out_dir: out/rtx5070
+  seq_len: 512
+  batch_size: 16
+  grad_accum_steps: 2         # effective batch = 32
+  eval_interval: 1000
+  eval_iters: 100
+  log_interval: 50
+  ckpt_interval: 2000
+  sample_tokens: 100
+  seed: 1337
+  device: auto                # -> cuda
+  dtype: auto                 # -> bf16
+  compile: false              # set true on CUDA for ~20-30% speedup (slow first step)
+  memory_cap_gb: 10           # leave ~2 GB for the desktop/display; raise if GPU is dedicated
+  optimizer:
+    lr: 3.0e-4
+    weight_decay: 0.1
+    beta1: 0.9
+    beta2: 0.95
+    grad_clip: 1.0
+  schedule:
+    warmup_steps: 500
+    max_steps: 200000
+    min_lr_ratio: 0.1
+
+data:
+  train_path: data/train.bin
+  val_path: data/val.bin
+  token_dtype: uint16

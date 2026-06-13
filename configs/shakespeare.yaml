@@ -1,0 +1,43 @@
+# A small real-data run: Shakespeare (BPE/gpt2) on Apple Silicon.
+#   rootllm-prepare-data --dataset shakespeare --tokenizer tiktoken --output-dir data/shakespeare
+#   rootllm-train --config configs/shakespeare.yaml
+# ~25M-param model; trains to legible Shakespeare-ish text in a few thousand steps.
+model:
+  vocab_size: 50257          # tiktoken gpt2
+  dim: 384
+  n_layers: 6
+  n_heads: 6
+  n_kv_heads: 2
+  max_seq_len: 512
+  dropout: 0.1               # small corpus -> a little regularisation helps
+  use_qk_norm: true
+  rope_theta: 10000.0
+  tie_embeddings: true
+
+train:
+  out_dir: out/shakespeare
+  seq_len: 256
+  batch_size: 32
+  grad_accum_steps: 1
+  eval_interval: 200
+  eval_iters: 50
+  log_interval: 25
+  ckpt_interval: 500
+  sample_tokens: 80          # log a generated sample at each eval
+  seed: 1337
+  device: auto               # -> mps
+  dtype: auto                # -> bf16
+  memory_cap_gb: 32
+  optimizer:
+    lr: 6.0e-4
+    weight_decay: 0.1
+    grad_clip: 1.0
+  schedule:
+    warmup_steps: 100
+    max_steps: 3000
+    min_lr_ratio: 0.1
+
+data:
+  train_path: data/shakespeare/train.bin
+  val_path: data/shakespeare/val.bin
+  token_dtype: uint16

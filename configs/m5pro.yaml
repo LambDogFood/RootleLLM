@@ -1,0 +1,57 @@
+# Tuned for an Apple Silicon M5 Pro (64 GB unified memory), bf16 on MPS.
+#
+# Measured on-device: ~180M non-embedding params, batch 8 @ seq 512 -> ~0.9 s/step
+# and ~16 GB resident, leaving comfortable headroom. With grad_accum 8 the
+# effective batch is 64. Raise train.seq_len to 1024 only if you can spare the
+# memory (MPS has no FlashAttention, so attention activations scale with seq^2:
+# seq 1024 at this size needs ~40 GB).
+#
+# vocab_size assumes a BPE tokenizer (e.g. tiktoken gpt2, ~50k). For the default
+# byte tokenizer set model.vocab_size=258. `rootllm-prepare-data` prints the
+# number to use.
+model:
+  vocab_size: 32000
+  dim: 1024
+  n_layers: 16
+  n_heads: 16
+  n_kv_heads: 4             # grouped-query attention (4x smaller KV cache)
+  max_seq_len: 2048
+  dropout: 0.0
+  use_qk_norm: true
+  rope_theta: 500000.0
+  tie_embeddings: true
+  # Recompute blocks in backward to cut activation memory ~40% for ~30% more
+  # compute. Leave off at seq 512 (fits in 16 GB); turn on to train at seq 1024
+  # (40 -> 24 GB) or seq 2048 (which would otherwise OOM 64 GB). Measured on M5 Pro.
+  gradient_checkpointing: false
+
+train:
+  out_dir: out/m5pro
+  seq_len: 512
+  batch_size: 8
+  grad_accum_steps: 8        # effective batch = 64
+  eval_interval: 500
+  eval_iters: 50
+  log_interval: 10
+  ckpt_interval: 1000
+  seed: 1337
+  device: auto              # -> mps on this machine
+  dtype: auto               # -> bf16 on mps
+  compile: false            # torch.compile is not reliable on MPS yet
+  memory_cap_gb: 32         # hard ceiling; past this the allocator OOMs instead of growing
+                            # (of ~55.7 GB recommended max on a 64 GB M5 Pro). Set null to disable.
+  optimizer:
+    lr: 3.0e-4
+    weight_decay: 0.1
+    beta1: 0.9
+    beta2: 0.95
+    grad_clip: 1.0
+  schedule:
+    warmup_steps: 200
+    max_steps: 20000
+    min_lr_ratio: 0.1
+
+data:
+  train_path: data/train.bin
+  val_path: data/val.bin
+  token_dtype: uint16

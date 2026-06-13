@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Project artifacts (regenerable via prepare_data / training — never commit)
+/data/
+out/
+checkpoints/
+*.pt
+*.ckpt
+wandb/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

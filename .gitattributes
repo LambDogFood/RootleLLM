@@ -1,0 +1,7 @@
+# Normalise to LF everywhere so shell scripts and code work inside the Linux
+# container even when checked out on Windows.
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.png binary
+*.jpg binary

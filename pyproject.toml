@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rootllm"
+version = "0.1.0"
+description = "A modern, readable decoder-only transformer (Llama/Mixtral-class) with training and generation tooling."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "RootlLLM" }]
+keywords = ["transformer", "llm", "pytorch", "gqa", "rope", "moe", "training"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.1",
+    "numpy>=1.21",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.1"]
+# Optional, higher-quality tokenizers. Byte-level tokenizer works without these.
+tokenizers = ["tiktoken>=0.5"]
+
+[project.scripts]
+rootllm-train = "rootllm.cli.train:main"
+rootllm-generate = "rootllm.cli.generate:main"
+rootllm-prepare-data = "rootllm.cli.prepare_data:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Lets `pytest` import the package from src/ and the `tests` helpers package
+# without an install step.
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

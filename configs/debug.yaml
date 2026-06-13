@@ -1,0 +1,39 @@
+# Tiny model for CPU/MPS smoke tests and CI. Trains in seconds on synthetic data.
+model:
+  vocab_size: 258          # 256 bytes + <bos>/<eos> (matches the byte tokenizer)
+  dim: 128
+  n_layers: 2
+  n_heads: 4
+  n_kv_heads: 2
+  max_seq_len: 256
+  dropout: 0.0
+  use_qk_norm: true
+  rope_theta: 10000.0
+  tie_embeddings: true
+
+train:
+  out_dir: out/debug
+  seq_len: 128
+  batch_size: 8
+  grad_accum_steps: 1
+  eval_interval: 25
+  eval_iters: 10
+  log_interval: 10
+  ckpt_interval: 50
+  seed: 1337
+  device: auto
+  dtype: auto
+  optimizer:
+    lr: 3.0e-4
+    weight_decay: 0.1
+    grad_clip: 1.0
+  schedule:
+    warmup_steps: 10
+    max_steps: 50
+    min_lr_ratio: 0.1
+
+data:
+  train_path: ""           # empty -> deterministic synthetic token stream
+  val_path: ""
+  token_dtype: uint16
+  synthetic_tokens: 20000

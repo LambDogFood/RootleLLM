@@ -1,0 +1,5 @@
+# Runtime dependencies. For development install the package instead:
+#   pip install -e ".[dev]"
+torch>=2.1
+numpy>=1.21
+pyyaml>=6.0

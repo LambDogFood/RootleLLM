@@ -1,0 +1,42 @@
+# A small (~25M non-embedding param) dense model — a reasonable first real run.
+# Point data.train_path at a corpus prepared with `rootllm-prepare-data`.
+model:
+  vocab_size: 32000
+  dim: 512
+  n_layers: 6
+  n_heads: 8
+  n_kv_heads: 2            # grouped-query attention
+  max_seq_len: 1024
+  dropout: 0.0
+  use_qk_norm: true
+  rope_theta: 500000.0
+  tie_embeddings: true
+
+train:
+  out_dir: out/small
+  seq_len: 256
+  batch_size: 16
+  grad_accum_steps: 4      # effective batch = 64
+  eval_interval: 250
+  eval_iters: 50
+  log_interval: 10
+  ckpt_interval: 500
+  seed: 1337
+  device: auto
+  dtype: auto
+  compile: false
+  optimizer:
+    lr: 3.0e-4
+    weight_decay: 0.1
+    beta1: 0.9
+    beta2: 0.95
+    grad_clip: 1.0
+  schedule:
+    warmup_steps: 200
+    max_steps: 5000
+    min_lr_ratio: 0.1
+
+data:
+  train_path: data/train.bin
+  val_path: data/val.bin
+  token_dtype: uint16

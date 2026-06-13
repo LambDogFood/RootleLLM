@@ -1,0 +1,14 @@
+# Keep the build context small and reproducible.
+.git
+out/
+data/
+*.bin
+*.pt
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+.DS_Store
