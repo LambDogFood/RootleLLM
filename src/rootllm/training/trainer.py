@@ -187,8 +187,9 @@ class Trainer:
         if val_loss < self.best_val_loss:
             self.best_val_loss = val_loss
             self._save("best.pt", step, val_loss)
-        if self.tcfg.always_save_checkpoint:
-            self._save("ckpt.pt", step, self.best_val_loss)
+        # Always refresh a 'latest' checkpoint at each eval, so a run that's
+        # cancelled (e.g. once it starts overfitting) is still servable.
+        self._save("ckpt.pt", step, self.best_val_loss)
 
     def _save(self, name: str, step: int, best_val_loss: float) -> None:
         path = os.path.join(self.tcfg.out_dir, name)
