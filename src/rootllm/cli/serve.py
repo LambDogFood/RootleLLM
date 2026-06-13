@@ -8,6 +8,7 @@ Example::
 from __future__ import annotations
 
 import argparse
+import os
 from typing import List, Optional
 
 from ..serve.server import serve
@@ -25,6 +26,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> None:
     args = build_parser().parse_args(argv)
+    # Fail with a clear message instead of a deep traceback (the usual startup crash).
+    if not os.path.exists(args.ckpt):
+        raise SystemExit(
+            f"checkpoint not found: {args.ckpt}\n"
+            "Did a training run finish and write it here? Try out/<config>/best.pt, "
+            "or run the train workflow to completion."
+        )
+    if args.tokenizer and not os.path.exists(args.tokenizer):
+        raise SystemExit(
+            f"tokenizer not found: {args.tokenizer}\n"
+            "Point --tokenizer at the one for your dataset, e.g. data/luau/tokenizer.json."
+        )
     serve(args.ckpt, args.tokenizer, host=args.host, port=args.port, device=args.device)
 
 

@@ -34,5 +34,14 @@ jobs:
           ROOTLLM_TOKENIZER: ${{ inputs.tokenizer }}
         run: |
           docker compose up -d --force-recreate serve
-          Write-Output "serving $env:ROOTLLM_CKPT on :8000"
-          Write-Output "query it:  rootllm-query --host <pc-ip> --prompt '...'"
+          Start-Sleep -Seconds 6
+          docker compose ps
+          Write-Output "--- recent serve logs (a startup crash shows here) ---"
+          docker compose logs --no-color --tail 60 serve
+          $cid = docker compose ps -q serve
+          $running = if ($cid) { docker inspect -f '{{.State.Running}}' $cid } else { "false" }
+          if ($running -ne "true") {
+            Write-Output "ERROR: serve container is not running (see logs above)"
+            exit 1
+          }
+          Write-Output "serve is up on :8000"
