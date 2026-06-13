@@ -139,3 +139,47 @@ ROOTLLM_BASE_IMAGE=nvcr.io/nvidia/pytorch:25.01-py3 docker compose build
 **Docker vs. a plain venv in WSL2:** Docker wins on reproducibility and
 portability (same image on the cloud later) and avoids dependency drift; a venv is
 lighter and simpler for a single box. Both train identically.
+
+## Drive it all from the laptop (PC = GPU server)
+
+The goal: develop + push on the laptop, then **trigger training and query the
+model remotely** without touching the PC.
+
+### Keep the PC's code current automatically
+
+Either rely on the auto-pull Scheduled Task (see the project chat / README), or
+have the runner/SSH command `git pull` before each run.
+
+### Trigger a training run from the laptop
+
+Enable the **Windows OpenSSH Server** (Settings → Apps → Optional Features → add
+"OpenSSH Server"; `Start-Service sshd`; `Set-Service sshd -StartupType Automatic`).
+Then from the laptop:
+
+```bash
+ssh <you>@<pc-ip> "cd rootllm && git pull && docker compose run -d --name train train"
+ssh <you>@<pc-ip> "docker logs -f train"        # watch progress
+```
+
+(Alternatively, a GitHub Actions **self-hosted runner** with a `workflow_dispatch`
+job lets you start a run from a button or `gh workflow run` — no SSH, no inbound
+networking.)
+
+### Query the model from the laptop
+
+On the PC, start the inference server (publishes port 8000) and open the firewall:
+```powershell
+docker compose up -d serve
+New-NetFirewallRule -DisplayName "rootllm serve" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
+```
+
+Then from the laptop, any time:
+```bash
+rootllm-query --host <pc-ip> --prompt "Once upon a time" --repetition-penalty 1.2
+rootllm-query --host <pc-ip> --chat --prompt "Give a blessing."
+# or plain curl:
+curl -s http://<pc-ip>:8000/generate -d '{"prompt":"Once upon a time","max_new_tokens":120}'
+```
+
+The server keeps the model warm on the GPU, so queries are fast. Point `--ckpt` at
+`out/.../best.pt` (or restart `serve` after training) to serve a newer checkpoint.

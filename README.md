@@ -123,6 +123,23 @@ rootllm-generate --ckpt out/sft/ckpt.pt --tokenizer data/shakespeare/tokenizer.j
 `rootllm-generate` supports `--temperature`, `--top-k`, `--top-p`, `--min-p`
 (scale-adaptive nucleus), and `--repetition-penalty` (>1 discourages loops).
 
+### Serving & remote querying
+
+Run a warm inference server on the GPU machine and query it from anywhere on the
+LAN (the client needs no model or torch — it's just HTTP):
+
+```bash
+# on the GPU machine:
+rootllm-serve --ckpt out/rtx5070/ckpt.pt --tokenizer data/tinystories/tokenizer.json
+
+# from a laptop:
+rootllm-query --host <gpu-ip> --prompt "Once upon a time" --repetition-penalty 1.2
+rootllm-query --host <gpu-ip> --chat --prompt "Give a blessing."   # for SFT'd models
+```
+
+`POST /generate` accepts a JSON body of the same sampling params, so `curl` and
+any other client work too.
+
 ## Configuration
 
 A run is fully described by one `Config` (model + train + data). Configs load

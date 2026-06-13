@@ -40,3 +40,13 @@ services:
   gpu-check:
     extends: train
     command: python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+
+  # Inference server. Start with `docker compose up -d serve` (publishes the port).
+  # Query it from the laptop:  rootllm-query --host <pc-ip> --prompt "Once upon a time"
+  serve:
+    extends: train
+    ports:
+      - "8000:8000"
+    command: >
+      python scripts/serve.py --ckpt out/rtx5070/ckpt.pt
+      --tokenizer data/tinystories/tokenizer.json --host 0.0.0.0 --port 8000

@@ -31,6 +31,8 @@ tokenizers = ["tiktoken>=0.5"]
 rootllm-train = "rootllm.cli.train:main"
 rootllm-generate = "rootllm.cli.generate:main"
 rootllm-prepare-data = "rootllm.cli.prepare_data:main"
+rootllm-serve = "rootllm.cli.serve:main"
+rootllm-query = "rootllm.cli.query:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
