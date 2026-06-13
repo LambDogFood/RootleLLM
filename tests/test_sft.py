@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import pathlib
 
 import torch
 
@@ -55,6 +56,14 @@ def test_padding_is_masked(tmp_path):
     # trailing pad positions contribute no loss
     assert (y[0] == IGNORE_INDEX).sum() > 0
     assert x[0, -1].item() == ds.pad_id
+
+
+def test_shipped_luau_instruction_set_loads():
+    path = pathlib.Path(__file__).resolve().parent.parent / "sft" / "luau.jsonl"
+    ds = SFTDataset.from_jsonl(str(path), ByteTokenizer())
+    assert len(ds) >= 20
+    # every example has a non-trivial response (loss is computed on it)
+    assert all(prompt_len < len(full) for full, prompt_len in ds.examples)
 
 
 def test_sft_step_reduces_response_loss(tmp_path):

@@ -1,0 +1,63 @@
+# Supervised fine-tune a Luau-pretrained model into an instruction-follower.
+# Run AFTER a `train` run with dataset=luau (which produces the base checkpoint).
+#   gh workflow run sft.yml -f init_from=out/rtx5070/best.pt
+name: sft
+run-name: "sft from ${{ inputs.init_from }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      init_from:
+        description: "Base checkpoint to fine-tune (a Luau-pretrained model)"
+        default: "out/rtx5070/best.pt"
+        type: string
+      sft_file:
+        description: "Instruction JSONL"
+        default: "sft/luau.jsonl"
+        type: string
+      tokenizer:
+        description: "Tokenizer json (must match the base model)"
+        default: "data/luau/tokenizer.json"
+        type: string
+      max_steps:
+        description: "SFT steps"
+        default: "800"
+        type: string
+
+jobs:
+  sft:
+    runs-on: self-hosted
+    timeout-minutes: 720
+    defaults:
+      run:
+        shell: 'powershell -ExecutionPolicy Bypass -Command "& ''{0}''; exit $LASTEXITCODE"'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Supervised fine-tune
+        env:
+          INIT_FROM: ${{ inputs.init_from }}
+          SFT_FILE: ${{ inputs.sft_file }}
+          TOKENIZER: ${{ inputs.tokenizer }}
+          MAX_STEPS: ${{ inputs.max_steps }}
+        run: |
+          $cmd = @(
+            "python", "scripts/train.py",
+            "--init-from", $env:INIT_FROM,
+            "--sft", $env:SFT_FILE,
+            "--tokenizer", $env:TOKENIZER,
+            "--set",
+            "train.out_dir=out/luau_sft",
+            "train.schedule.max_steps=$env:MAX_STEPS",
+            "train.schedule.warmup_steps=20",
+            "train.eval_interval=200",
+            "train.sample_tokens=0",
+            "train.batch_size=8",
+            "train.seq_len=256"
+          )
+          docker compose run --rm train @cmd

@@ -54,7 +54,10 @@ def main(argv: Optional[List[str]] = None) -> None:
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req) as resp:
+    # Connect directly, ignoring any http_proxy / macOS system proxy — those can
+    # hijack a plain LAN request and surface as "No route to host".
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(req, timeout=120) as resp:
         result = json.loads(resp.read())
     print(result["text"] if args.full else result["completion"])
 
