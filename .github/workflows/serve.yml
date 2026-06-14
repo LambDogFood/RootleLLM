@@ -38,6 +38,7 @@ jobs:
           ROOTLLM_TOKENIZER: ${{ inputs.tokenizer }}
           ROOTLLM_UNCERTAINTY: ${{ inputs.uncertainty }}
         run: |
+          docker compose stop qlora-serve   # free port 8000 if the qlora server is up
           docker compose up -d --force-recreate serve
           Start-Sleep -Seconds 6
           docker compose ps
