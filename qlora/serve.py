@@ -69,16 +69,15 @@ class HFModelService:
         torch = self._torch
         prompt = req.get("prompt", "")
         messages = [{"role": "user", "content": prompt}]
-        input_ids = self.tok.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt"
+        enc = self.tok.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True
         ).to(self.device)
-        attention_mask = torch.ones_like(input_ids)
+        input_len = enc["input_ids"].shape[1]
         temperature = float(req.get("temperature", 0.7))
 
         with self._lock, torch.no_grad():
             out = self.model.generate(
-                input_ids,
-                attention_mask=attention_mask,
+                **enc,
                 max_new_tokens=int(req.get("max_new_tokens", self.default_max_new_tokens)),
                 do_sample=temperature > 0,
                 temperature=temperature if temperature > 0 else None,
@@ -89,7 +88,7 @@ class HFModelService:
                 pad_token_id=self.tok.eos_token_id,
             )
 
-        gen_ids = out.sequences[0][input_ids.shape[1]:]
+        gen_ids = out.sequences[0][input_len:]
         completion = self.tok.decode(gen_ids, skip_special_tokens=True)
         if out.scores:
             confs = [torch.softmax(s[0].float(), dim=-1).max().item() for s in out.scores]
