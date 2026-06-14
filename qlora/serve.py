@@ -29,7 +29,7 @@ class HFModelService:
     HuggingFace causal LM (optionally with a LoRA adapter)."""
 
     def __init__(self, base, adapter=None, uncertainty_threshold=0.0,
-                 research_queue=None, default_max_new_tokens=256):
+                 research_queue=None, default_max_new_tokens=1024):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
