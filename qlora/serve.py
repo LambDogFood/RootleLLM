@@ -35,13 +35,14 @@ class HFModelService:
 
         self.log = get_logger()
         self._torch = torch
-        self.tok = AutoTokenizer.from_pretrained(adapter or base)
+        # Use the adapter dir only if it actually exists, so an unset/not-yet-trained
+        # adapter falls back to the base model (for both tokenizer and weights).
+        has_adapter = bool(adapter) and os.path.isdir(adapter)
+        self.tok = AutoTokenizer.from_pretrained(adapter if has_adapter else base)
         self.model = AutoModelForCausalLM.from_pretrained(
             base, torch_dtype=torch.bfloat16, device_map="auto"
         )
-        # Load the LoRA adapter only if it exists, so you can serve the base model
-        # directly (smart immediately) before any fine-tuning.
-        if adapter and os.path.isdir(adapter):
+        if has_adapter:
             from peft import PeftModel
 
             self.model = PeftModel.from_pretrained(self.model, adapter)
