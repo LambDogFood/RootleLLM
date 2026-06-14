@@ -31,6 +31,29 @@ def test_model_service_completes(ckpt):
     out = service.complete({"prompt": "hi", "max_new_tokens": 5, "temperature": 0.0})
     assert "completion" in out and "text" in out
     assert out["text"].startswith("hi")
+    assert 0.0 <= out["confidence"] <= 1.0
+
+
+def test_low_confidence_queues_topic(ckpt, tmp_path):
+    queue = tmp_path / "queue.txt"
+    # threshold 1.1 forces every answer to count as "low confidence"
+    service = ModelService(ckpt, device="cpu", uncertainty_threshold=1.1, research_queue=str(queue))
+    out = service.complete({"prompt": "roblox pathfinding", "max_new_tokens": 4})
+    assert out["queued_for_research"] is True
+    assert "roblox pathfinding" in queue.read_text()
+
+    # same topic again -> deduped, not re-added
+    out2 = service.complete({"prompt": "roblox pathfinding", "max_new_tokens": 4})
+    assert out2["queued_for_research"] is False
+    assert queue.read_text().count("roblox pathfinding") == 1
+
+
+def test_no_queue_when_threshold_zero(ckpt, tmp_path):
+    queue = tmp_path / "queue.txt"
+    service = ModelService(ckpt, device="cpu", uncertainty_threshold=0.0, research_queue=str(queue))
+    out = service.complete({"prompt": "anything", "max_new_tokens": 4})
+    assert "queued_for_research" not in out
+    assert not queue.exists()
 
 
 def test_query_url_normalisation():

@@ -21,6 +21,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--host", default="0.0.0.0", help="0.0.0.0 to accept LAN connections")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--device", default="auto")
+    p.add_argument("--uncertainty-threshold", type=float, default=0.0,
+                   help="below this answer-confidence, queue the topic for research (0 = off)")
+    p.add_argument("--research-queue", default="data/research/queue.txt",
+                   help="file to append low-confidence topics to")
     return p
 
 
@@ -45,7 +49,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             f"tokenizer not found: {args.tokenizer}\n"
             "Point --tokenizer at the one for your dataset, e.g. data/luau/tokenizer.json."
         )
-    serve(args.ckpt, args.tokenizer, host=args.host, port=args.port, device=args.device)
+    serve(
+        args.ckpt, args.tokenizer, host=args.host, port=args.port, device=args.device,
+        uncertainty_threshold=args.uncertainty_threshold, research_queue=args.research_queue,
+    )
 
 
 if __name__ == "__main__":

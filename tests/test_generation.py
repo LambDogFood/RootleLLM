@@ -84,6 +84,16 @@ def test_generate_accepts_new_sampling_args():
     assert out.shape == (1, 10)
 
 
+def test_generate_returns_confidence():
+    cfg = make_model_config()
+    model = Transformer(cfg).eval()
+    prompt = torch.randint(0, cfg.vocab_size, (1, 4))
+    out, conf = generate(model, prompt, max_new_tokens=6, return_confidence=True)
+    assert out.shape == (1, 10)
+    assert conf.shape == (1,)
+    assert 0.0 <= float(conf[0]) <= 1.0
+
+
 def test_generation_does_not_leave_model_in_eval():
     cfg = make_model_config()
     model = Transformer(cfg)

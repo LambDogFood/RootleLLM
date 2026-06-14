@@ -80,12 +80,17 @@ def generate(
     min_p: Optional[float] = None,
     repetition_penalty: float = 1.0,
     eos_token_id: Optional[int] = None,
-) -> torch.Tensor:
+    return_confidence: bool = False,
+):
     """Sample up to ``max_new_tokens`` continuations for each row of ``input_ids``.
 
     ``temperature == 0`` selects greedy (argmax) decoding. ``repetition_penalty``
     (>1) discourages repeating tokens already in the sequence. Returns the full
     sequence including the prompt, shape ``(B, T + generated)``.
+
+    With ``return_confidence=True`` also returns a per-row confidence in ``[0, 1]``
+    — the mean, over generated steps, of the model's top raw next-token
+    probability. High = peaked/certain distributions; low = the model is guessing.
     """
     was_training = model.training
     model.eval()
@@ -96,10 +101,15 @@ def generate(
         input_ids, kv_caches=[None] * model.cfg.n_layers, start_pos=0
     )
     pos = T
+    confidences = []
 
     for _ in range(max_new_tokens):
-        next_logits = logits[:, -1, :]
-        next_logits = apply_repetition_penalty(next_logits, input_ids, repetition_penalty)
+        raw_logits = logits[:, -1, :]
+        if return_confidence:
+            # Certainty of the *unmodified* distribution (before temp/penalty/filter).
+            confidences.append(F.softmax(raw_logits.float(), dim=-1).max(dim=-1).values)
+
+        next_logits = apply_repetition_penalty(raw_logits, input_ids, repetition_penalty)
         next_logits = next_logits / max(temperature, 1e-6)
         next_logits = filter_logits(next_logits, top_k, top_p, min_p)
 
@@ -118,4 +128,11 @@ def generate(
 
     if was_training:
         model.train()
+
+    if return_confidence:
+        if confidences:
+            conf = torch.stack(confidences, dim=1).mean(dim=1)
+        else:
+            conf = torch.ones(input_ids.shape[0], device=input_ids.device)
+        return input_ids, conf
     return input_ids

@@ -9,6 +9,7 @@ right for a personal LAN server. No framework — just the standard library.
 from __future__ import annotations
 
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
@@ -41,6 +42,8 @@ class ModelService:
         tokenizer_path: Optional[str] = None,
         device: str = "auto",
         default_max_new_tokens: int = 128,
+        uncertainty_threshold: float = 0.0,
+        research_queue: Optional[str] = None,
     ):
         self.log = get_logger()
         self.device = resolve_device(device)
@@ -51,19 +54,24 @@ class ModelService:
         self.model.to(self.device).eval()
         self.tokenizer = load_tokenizer(tokenizer_path) if tokenizer_path else ByteTokenizer()
         self.default_max_new_tokens = default_max_new_tokens
+        # Active learning: when an answer's confidence is below the threshold, the
+        # topic is appended to the research queue for later ingest + retrain.
+        self.uncertainty_threshold = uncertainty_threshold
+        self.research_queue = research_queue
         self._lock = threading.Lock()
+        self._queue_lock = threading.Lock()
         self.info = {
             "params": self.model.num_params(),
             "device": str(self.device),
             "vocab_size": cfg.model.vocab_size,
             "ckpt": ckpt,
             "step": payload.get("step"),
+            "uncertainty_threshold": uncertainty_threshold,
         }
 
     def complete(self, req: Dict[str, Any]) -> Dict[str, Any]:
-        prompt = req.get("prompt", "")
-        if req.get("chat"):
-            prompt = format_prompt(prompt)
+        raw_prompt = req.get("prompt", "")
+        prompt = format_prompt(raw_prompt) if req.get("chat") else raw_prompt
 
         ids = self.tokenizer.encode(prompt)
         if not ids:
@@ -73,7 +81,7 @@ class ModelService:
         eos = self.tokenizer.eos_id if self.tokenizer.eos_id >= 0 else None
 
         with self._lock:  # one generation at a time on the GPU
-            out = generate(
+            out, conf = generate(
                 self.model,
                 input_ids,
                 max_new_tokens=int(req.get("max_new_tokens", self.default_max_new_tokens)),
@@ -83,10 +91,43 @@ class ModelService:
                 min_p=_opt_float(req.get("min_p")),
                 repetition_penalty=float(req.get("repetition_penalty", 1.0)),
                 eos_token_id=eos,
+                return_confidence=True,
             )
+        confidence = float(conf[0])
         text = self.tokenizer.decode(out[0].tolist())
         completion = text[len(prompt):] if text.startswith(prompt) else text
-        return {"prompt": prompt, "completion": completion, "text": text}
+        result = {
+            "prompt": prompt,
+            "completion": completion,
+            "text": text,
+            "confidence": round(confidence, 4),
+        }
+
+        # Active learning: queue low-confidence topics for research.
+        if (
+            self.uncertainty_threshold > 0
+            and confidence < self.uncertainty_threshold
+            and raw_prompt.strip()
+        ):
+            result["queued_for_research"] = self._queue_topic(raw_prompt.strip())
+        return result
+
+    def _queue_topic(self, topic: str) -> bool:
+        """Append a topic to the research queue (deduped). Returns True if added."""
+        if not self.research_queue:
+            return False
+        with self._queue_lock:
+            existing = set()
+            if os.path.exists(self.research_queue):
+                with open(self.research_queue) as f:
+                    existing = {line.strip() for line in f}
+            if topic in existing:
+                return False
+            os.makedirs(os.path.dirname(os.path.abspath(self.research_queue)), exist_ok=True)
+            with open(self.research_queue, "a", encoding="utf-8") as f:
+                f.write(topic + "\n")
+            self.log.info("queued for research (confidence low): %r", topic)
+            return True
 
 
 def _make_handler(service: ModelService):
@@ -132,12 +173,19 @@ def serve(
     host: str = "0.0.0.0",
     port: int = 8000,
     device: str = "auto",
+    uncertainty_threshold: float = 0.0,
+    research_queue: Optional[str] = None,
 ) -> None:
-    service = ModelService(ckpt, tokenizer_path, device)
+    service = ModelService(
+        ckpt, tokenizer_path, device,
+        uncertainty_threshold=uncertainty_threshold, research_queue=research_queue,
+    )
     httpd = build_server(service, host, port)
+    extra = (f"  — active learning on (threshold {uncertainty_threshold}) -> {research_queue}"
+             if uncertainty_threshold > 0 else "")
     get_logger().info(
-        "serving %s (%.1fM params, %s) on http://%s:%d  — POST /generate",
-        ckpt, service.info["params"] / 1e6, service.info["device"], host, port,
+        "serving %s (%.1fM params, %s) on http://%s:%d  — POST /generate%s",
+        ckpt, service.info["params"] / 1e6, service.info["device"], host, port, extra,
     )
     try:
         httpd.serve_forever()

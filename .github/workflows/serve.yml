@@ -15,6 +15,10 @@ on:
         description: "Tokenizer json (match the dataset you trained on)"
         default: "data/tinystories/tokenizer.json"
         type: string
+      uncertainty:
+        description: "Auto-queue topics below this answer-confidence (0 = off)"
+        default: "0"
+        type: string
 
 jobs:
   serve:
@@ -32,6 +36,7 @@ jobs:
         env:
           ROOTLLM_CKPT: ${{ inputs.ckpt }}
           ROOTLLM_TOKENIZER: ${{ inputs.tokenizer }}
+          ROOTLLM_UNCERTAINTY: ${{ inputs.uncertainty }}
         run: |
           docker compose up -d --force-recreate serve
           Start-Sleep -Seconds 6
