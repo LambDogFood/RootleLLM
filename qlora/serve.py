@@ -38,10 +38,13 @@ class HFModelService:
         # Use the adapter dir only if it actually exists, so an unset/not-yet-trained
         # adapter falls back to the base model (for both tokenizer and weights).
         has_adapter = bool(adapter) and os.path.isdir(adapter)
+        # Single, explicit device — device_map="auto" makes model.device unreliable
+        # and can crash generation mid-request.
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tok = AutoTokenizer.from_pretrained(adapter if has_adapter else base)
         self.model = AutoModelForCausalLM.from_pretrained(
-            base, torch_dtype=torch.bfloat16, device_map="auto"
-        )
+            base, torch_dtype=torch.bfloat16
+        ).to(self.device)
         if has_adapter:
             from peft import PeftModel
 
@@ -58,7 +61,7 @@ class HFModelService:
         self._lock = threading.Lock()
         self._queue_lock = threading.Lock()
         self.info = {
-            "base": base, "adapter": adapter, "device": str(self.model.device),
+            "base": base, "adapter": adapter, "device": self.device,
             "uncertainty_threshold": uncertainty_threshold,
         }
 
@@ -68,12 +71,14 @@ class HFModelService:
         messages = [{"role": "user", "content": prompt}]
         input_ids = self.tok.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt"
-        ).to(self.model.device)
+        ).to(self.device)
+        attention_mask = torch.ones_like(input_ids)
         temperature = float(req.get("temperature", 0.7))
 
         with self._lock, torch.no_grad():
             out = self.model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 max_new_tokens=int(req.get("max_new_tokens", self.default_max_new_tokens)),
                 do_sample=temperature > 0,
                 temperature=temperature if temperature > 0 else None,
