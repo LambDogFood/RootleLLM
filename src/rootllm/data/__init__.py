@@ -9,6 +9,7 @@ from .dataset import (
     write_token_bin,
 )
 from .download import DATASETS, download_dataset
+from .ingest import fetch_stackoverflow, fetch_wikipedia, ingest_topic
 from .luau import fetch_luau_corpus
 from .sft import SFTDataset, format_prompt
 from .tokenizer import ByteTokenizer, Tokenizer, build_tokenizer, load_tokenizer
@@ -25,6 +26,9 @@ __all__ = [
     "DATASETS",
     "download_dataset",
     "fetch_luau_corpus",
+    "ingest_topic",
+    "fetch_wikipedia",
+    "fetch_stackoverflow",
     "SFTDataset",
     "format_prompt",
 ]

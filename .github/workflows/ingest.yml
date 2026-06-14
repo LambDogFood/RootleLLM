@@ -1,0 +1,41 @@
+# Research a topic from whitelisted sources and add it to the corpus.
+# The corpus accumulates across runs; train on it once you've gathered enough.
+#   gh workflow run ingest.yml -f topic="roblox pathfinding"
+name: ingest
+run-name: "ingest ${{ inputs.topic }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic to research"
+        required: true
+        type: string
+      tags:
+        description: "Stack Overflow tags (space-separated)"
+        default: "lua roblox"
+        type: string
+
+jobs:
+  ingest:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: 'powershell -ExecutionPolicy Bypass -Command "& ''{0}''; exit $LASTEXITCODE"'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Research and ingest
+        env:
+          TOPIC: ${{ inputs.topic }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          $tags = $env:TAGS.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+          $cmd = @("python", "scripts/ingest.py", "--topic", $env:TOPIC,
+                   "--out-dir", "data/research", "--tags") + $tags
+          docker compose run --rm train @cmd

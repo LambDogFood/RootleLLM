@@ -33,6 +33,7 @@ rootllm-generate = "rootllm.cli.generate:main"
 rootllm-prepare-data = "rootllm.cli.prepare_data:main"
 rootllm-serve = "rootllm.cli.serve:main"
 rootllm-query = "rootllm.cli.query:main"
+rootllm-ingest = "rootllm.cli.ingest:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

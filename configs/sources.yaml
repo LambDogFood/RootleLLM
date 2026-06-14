@@ -1,0 +1,25 @@
+# Whitelisted research sources. The ingester only pulls from these.
+# Recency: each adapter favours new material (live pages, recent activity).
+
+# --- active (no auth required) ---
+wikipedia:
+  enabled: true              # MediaWiki API search -> article extracts (always current)
+
+stackoverflow:
+  enabled: true              # Stack Exchange API -> problem->solution pairs (SFT data)
+  tags: [lua, roblox, luau]
+  sort: activity             # most recently active first
+
+# --- planned (same adapter pattern; need a GitHub token / repo fetch) ---
+github_code:
+  enabled: false
+  query: "language:Lua"
+  sort: pushed               # favour recently-pushed repos
+
+roblox_docs:
+  enabled: false
+  repo: Roblox/creator-docs  # markdown docs, fetched fresh
+
+luau_docs:
+  enabled: false
+  repo: luau-lang/luau       # docs/*.md, fetched fresh
