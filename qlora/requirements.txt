@@ -3,5 +3,4 @@ transformers>=4.45
 peft>=0.13
 accelerate>=1.0
 datasets>=3.0
-# only needed for --four-bit (7B+); 1.5B in bf16 does not need it:
-# bitsandbytes>=0.44
+bitsandbytes>=0.45   # 4-bit QLoRA for 7B+ (needs a Blackwell/sm_120-capable build)

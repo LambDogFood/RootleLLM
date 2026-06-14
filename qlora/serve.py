@@ -29,7 +29,7 @@ class HFModelService:
     HuggingFace causal LM (optionally with a LoRA adapter)."""
 
     def __init__(self, base, adapter=None, uncertainty_threshold=0.0,
-                 research_queue=None, default_max_new_tokens=1024):
+                 research_queue=None, default_max_new_tokens=1024, four_bit=False):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -38,13 +38,23 @@ class HFModelService:
         # Use the adapter dir only if it actually exists, so an unset/not-yet-trained
         # adapter falls back to the base model (for both tokenizer and weights).
         has_adapter = bool(adapter) and os.path.isdir(adapter)
-        # Single, explicit device — device_map="auto" makes model.device unreliable
-        # and can crash generation mid-request.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tok = AutoTokenizer.from_pretrained(adapter if has_adapter else base)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            base, torch_dtype=torch.bfloat16
-        ).to(self.device)
+        if four_bit:
+            from transformers import BitsAndBytesConfig
+
+            bnb = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                base, quantization_config=bnb, device_map={"": 0}
+            )
+        else:
+            # bf16 on a single explicit device (device_map="auto" can crash generate).
+            self.model = AutoModelForCausalLM.from_pretrained(
+                base, torch_dtype=torch.bfloat16
+            ).to(self.device)
         if has_adapter:
             from peft import PeftModel
 
@@ -129,10 +139,11 @@ def main(argv: Optional[list] = None) -> None:
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--uncertainty-threshold", type=float, default=0.0)
     ap.add_argument("--research-queue", default="data/research/queue.txt")
+    ap.add_argument("--four-bit", action="store_true", help="load in 4-bit (for 7B+; needs bitsandbytes)")
     args = ap.parse_args(argv)
 
     service = HFModelService(
-        args.base, args.adapter,
+        args.base, args.adapter, four_bit=args.four_bit,
         uncertainty_threshold=args.uncertainty_threshold, research_queue=args.research_queue,
     )
     httpd = build_server(service, args.host, args.port)

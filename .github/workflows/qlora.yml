@@ -14,7 +14,11 @@ on:
         options: [serve, finetune]
       base:
         description: "Base model"
-        default: "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+        default: "Qwen/Qwen2.5-Coder-7B-Instruct"
+        type: string
+      four_bit:
+        description: "4-bit (needed for 7B+ on 12GB)"
+        default: "true"
         type: string
       adapter:
         description: "LoRA adapter dir (serve: omit/none for base only)"
@@ -50,9 +54,11 @@ jobs:
           BASE: ${{ inputs.base }}
           OUT: ${{ inputs.adapter }}
           SFT: ${{ inputs.sft }}
+          FOUR_BIT: ${{ inputs.four_bit }}
         run: |
           $sft = $env:SFT.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
           $cmd = @("python", "qlora/finetune.py", "--base", $env:BASE, "--out", $env:OUT, "--sft") + $sft
+          if ($env:FOUR_BIT -eq "true") { $cmd += "--four-bit" }
           docker compose run --rm finetune @cmd
 
       - name: Serve
@@ -61,6 +67,7 @@ jobs:
           QLORA_BASE: ${{ inputs.base }}
           QLORA_ADAPTER: ${{ inputs.adapter }}
           ROOTLLM_UNCERTAINTY: ${{ inputs.uncertainty }}
+          QLORA_FLAGS: ${{ inputs.four_bit == 'true' && '--four-bit' || '' }}
         run: |
           docker compose stop serve         # free port 8000 if the from-scratch server is up
           docker compose up -d --force-recreate qlora-serve

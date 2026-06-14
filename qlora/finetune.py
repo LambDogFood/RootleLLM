@@ -65,7 +65,12 @@ def main() -> None:
         )
         model_kwargs["device_map"] = "auto"
     model = AutoModelForCausalLM.from_pretrained(args.base, **model_kwargs)
-    model.enable_input_require_grads()  # required for grad checkpointing on a frozen base
+    if args.four_bit:
+        from peft import prepare_model_for_kbit_training
+
+        model = prepare_model_for_kbit_training(model)  # QLoRA prep (also enables grad reqs)
+    else:
+        model.enable_input_require_grads()  # required for grad checkpointing on a frozen base
 
     model = get_peft_model(
         model,

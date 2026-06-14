@@ -66,9 +66,10 @@ services:
     ports:
       - "8000:8000"
     command: >
-      python qlora/serve.py --base ${QLORA_BASE:-Qwen/Qwen2.5-Coder-1.5B-Instruct}
+      python qlora/serve.py --base ${QLORA_BASE:-Qwen/Qwen2.5-Coder-7B-Instruct}
       --adapter ${QLORA_ADAPTER:-out/qlora-luau}
       --uncertainty-threshold ${ROOTLLM_UNCERTAINTY:-0}
+      ${QLORA_FLAGS:-}
 
   # Inference server. Start with `docker compose up -d serve` (publishes the port).
   # Query it from the laptop:  rootllm-query --host <pc-ip> --prompt "Once upon a time"
