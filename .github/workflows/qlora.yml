@@ -1,0 +1,69 @@
+# QLoRA engine: fine-tune or serve a pretrained code model on your GPU.
+#   gh workflow run qlora.yml -f action=serve            # serve the base model (no training)
+#   gh workflow run qlora.yml -f action=finetune         # LoRA-tune on Luau data
+name: qlora
+run-name: "qlora ${{ inputs.action }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "finetune or serve"
+        default: "serve"
+        type: choice
+        options: [serve, finetune]
+      base:
+        description: "Base model"
+        default: "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+        type: string
+      adapter:
+        description: "LoRA adapter dir (serve: omit/none for base only)"
+        default: "out/qlora-luau"
+        type: string
+      sft:
+        description: "Instruction JSONL files (finetune)"
+        default: "sft/luau.jsonl data/research/sft.jsonl"
+        type: string
+      uncertainty:
+        description: "Auto-queue topics below this confidence (serve; 0 = off)"
+        default: "0"
+        type: string
+
+jobs:
+  qlora:
+    runs-on: self-hosted
+    timeout-minutes: 720
+    defaults:
+      run:
+        shell: 'powershell -ExecutionPolicy Bypass -Command "& ''{0}''; exit $LASTEXITCODE"'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Build qlora image
+        run: docker compose build finetune
+
+      - name: Fine-tune (LoRA)
+        if: ${{ inputs.action == 'finetune' }}
+        env:
+          BASE: ${{ inputs.base }}
+          OUT: ${{ inputs.adapter }}
+          SFT: ${{ inputs.sft }}
+        run: |
+          $sft = $env:SFT.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+          $cmd = @("python", "qlora/finetune.py", "--base", $env:BASE, "--out", $env:OUT, "--sft") + $sft
+          docker compose run --rm finetune @cmd
+
+      - name: Serve
+        if: ${{ inputs.action == 'serve' }}
+        env:
+          QLORA_BASE: ${{ inputs.base }}
+          QLORA_ADAPTER: ${{ inputs.adapter }}
+          ROOTLLM_UNCERTAINTY: ${{ inputs.uncertainty }}
+        run: |
+          docker compose up -d --force-recreate qlora-serve
+          Start-Sleep -Seconds 8
+          docker compose ps
+          Write-Output "--- recent qlora-serve logs ---"
+          docker compose logs --no-color --tail 50 qlora-serve

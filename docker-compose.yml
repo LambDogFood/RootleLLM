@@ -41,6 +41,35 @@ services:
     extends: train
     command: python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
 
+  # --- QLoRA engine (pretrained code model + LoRA) ---
+  finetune:
+    build:
+      context: .
+      dockerfile: qlora/Dockerfile
+      args:
+        BASE: ${ROOTLLM_BASE_IMAGE:-pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime}
+    image: rootllm-qlora:latest
+    working_dir: /workspace/rootllm
+    volumes:
+      - .:/workspace/rootllm
+      - ./data:/workspace/rootllm/data
+      - ./out:/workspace/rootllm/out
+      - hf_cache:/root/.cache/huggingface   # cache the downloaded base model
+    environment:
+      - PYTHONPATH=/workspace/rootllm/src
+    shm_size: "8gb"
+    gpus: all
+    command: python qlora/finetune.py --sft sft/luau.jsonl
+
+  qlora-serve:
+    extends: finetune
+    ports:
+      - "8000:8000"
+    command: >
+      python qlora/serve.py --base ${QLORA_BASE:-Qwen/Qwen2.5-Coder-1.5B-Instruct}
+      --adapter ${QLORA_ADAPTER:-out/qlora-luau}
+      --uncertainty-threshold ${ROOTLLM_UNCERTAINTY:-0}
+
   # Inference server. Start with `docker compose up -d serve` (publishes the port).
   # Query it from the laptop:  rootllm-query --host <pc-ip> --prompt "Once upon a time"
   serve:
@@ -52,3 +81,6 @@ services:
       --tokenizer ${ROOTLLM_TOKENIZER:-data/tinystories/tokenizer.json}
       --uncertainty-threshold ${ROOTLLM_UNCERTAINTY:-0}
       --host 0.0.0.0 --port 8000
+
+volumes:
+  hf_cache:   # persists the downloaded base model across runs
